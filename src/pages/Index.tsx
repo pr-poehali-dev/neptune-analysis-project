@@ -286,9 +286,18 @@ export default function Index() {
             className="text-center backdrop-blur-sm px-8 py-6 rounded-2xl"
             style={{ background: "radial-gradient(circle, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.5) 70%, transparent 100%)" }}
           >
-            <h1 className="text-4xl font-bold md:text-6xl font-heading">
-              {data.platformName} 🚀
-            </h1>
+            {isAdmin ? (
+              <input
+                value={data.platformName}
+                onChange={e => persist({ ...data, platformName: e.target.value })}
+                className="bg-transparent text-white font-bold text-4xl md:text-6xl text-center outline-none border-b-2 border-purple-400/50 pb-1 w-full"
+                placeholder="Название платформы"
+              />
+            ) : (
+              <h1 className="text-4xl font-bold md:text-6xl font-heading">
+                {data.platformName} 🚀
+              </h1>
+            )}
             <p className="mt-3 text-lg text-white/70 md:text-xl">
               {data.nickname}
             </p>
