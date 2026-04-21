@@ -1,425 +1,444 @@
 import { StarField } from "@/components/StarField"
-import { ChevronDown, Linkedin, Users, LineChart, Clock, Lightbulb, BotIcon as Robot } from "lucide-react"
-import { ContactForm } from "@/components/ContactForm"
-import { ChatbotModal } from "@/components/ChatbotModal"
 import { useState, useEffect, useRef } from "react"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
+import Icon from "@/components/ui/icon"
 
-export default function Index() {
-  const [isHeadingVisible, setIsHeadingVisible] = useState(false)
-  const [isAboutVisible, setIsAboutVisible] = useState(false)
-  const [isServicesVisible, setIsServicesVisible] = useState(false)
-  const [isServicesTitleVisible, setIsServicesTitleVisible] = useState(false)
-  const [blurAmount, setBlurAmount] = useState(0)
-  const [isChatbotOpen, setIsChatbotOpen] = useState(false)
-  const [initialHeight, setInitialHeight] = useState(0)
-  const headingRef = useRef<HTMLHeadingElement>(null)
-  const aboutSectionRef = useRef<HTMLElement>(null)
-  const aboutContentRef = useRef<HTMLDivElement>(null)
-  const servicesSectionRef = useRef<HTMLElement>(null)
-  const servicesContentRef = useRef<HTMLDivElement>(null)
-  const servicesTitleRef = useRef<HTMLHeadingElement>(null)
-  const contactSectionRef = useRef<HTMLElement>(null)
-  const scrollRef = useRef(0)
-  const lastScrollRef = useRef(0)
-  const ticking = useRef(false)
+// ─── типы ────────────────────────────────────────────────────────────────────
+interface Card {
+  id: number
+  title: string
+  description: string
+  size: "small" | "medium" | "large"
+  emoji: string
+}
 
-  // Store initial height on first render
-  useEffect(() => {
-    if (initialHeight === 0) {
-      setInitialHeight(window.innerHeight)
-    }
-  }, [initialHeight])
+interface SiteData {
+  banner: string
+  platformName: string
+  nickname: string
+  profileUrl: string
+  trackUrl: string
+  trackTitle: string
+  cards: Card[]
+}
 
-  // Handle scroll events to calculate blur amount
-  useEffect(() => {
-    const handleScroll = () => {
-      // Store the current scroll position
-      scrollRef.current = window.scrollY
+// ─── начальные данные ─────────────────────────────────────────────────────────
+const DEFAULT_DATA: SiteData = {
+  banner: "✨ Добро пожаловать на мою платформу!",
+  platformName: "Nebula Ventures",
+  nickname: "@nebula",
+  profileUrl: "https://t.me/nebula",
+  trackUrl: "",
+  trackTitle: "Мой трек",
+  cards: [
+    { id: 1, title: "Обо мне", description: "Расскажите о себе здесь — кто вы, чем занимаетесь и что предлагаете.", size: "large", emoji: "🚀" },
+    { id: 2, title: "Услуги", description: "Перечислите ваши услуги и преимущества работы с вами.", size: "medium", emoji: "💡" },
+    { id: 3, title: "Контакты", description: "Как с вами связаться — почта, телефон, соцсети.", size: "small", emoji: "📩" },
+  ],
+}
 
-      if (!ticking.current) {
-        window.requestAnimationFrame(() => {
-          // Calculate blur based on scroll position
-          // Reduced max blur from 20px to 8px for a more subtle effect
-          const maxBlur = 8
-          // Increased trigger height to make the effect develop more slowly
-          const triggerHeight = initialHeight * 1.2
-          const newBlurAmount = Math.min(maxBlur, (scrollRef.current / triggerHeight) * maxBlur)
+// ─── утилита: локальное хранилище ─────────────────────────────────────────────
+function loadData(): SiteData {
+  try {
+    const raw = localStorage.getItem("nebula_data")
+    return raw ? JSON.parse(raw) : DEFAULT_DATA
+  } catch {
+    return DEFAULT_DATA
+  }
+}
 
-          setBlurAmount(newBlurAmount)
+function saveData(data: SiteData) {
+  localStorage.setItem("nebula_data", JSON.stringify(data))
+}
 
-          // Update last scroll position for next comparison
-          lastScrollRef.current = scrollRef.current
-          ticking.current = false
-        })
+// ─── иконка пера (встроенная) ─────────────────────────────────────────────────
+const sizeMap = {
+  small: { label: "Маленькая", cols: "col-span-1", minH: "min-h-[120px]" },
+  medium: { label: "Средняя", cols: "col-span-1 sm:col-span-2", minH: "min-h-[160px]" },
+  large: { label: "Большая", cols: "col-span-1 sm:col-span-3", minH: "min-h-[200px]" },
+}
 
-        ticking.current = true
-      }
-    }
+// ─── Компонент редактируемой плашки ──────────────────────────────────────────
+function CardItem({
+  card,
+  isAdmin,
+  onUpdate,
+  onDelete,
+}: {
+  card: Card
+  isAdmin: boolean
+  onUpdate: (card: Card) => void
+  onDelete: (id: number) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(card)
 
-    window.addEventListener("scroll", handleScroll, { passive: true })
-
-    return () => {
-      window.removeEventListener("scroll", handleScroll)
-    }
-  }, [initialHeight])
-
-  // Intersection observer for visibility
-  useEffect(() => {
-    const headingObserver = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsHeadingVisible(true)
-          // Once visible, no need to observe anymore
-          if (headingRef.current) {
-            headingObserver.unobserve(headingRef.current)
-          }
-        }
-      },
-      {
-        threshold: 0.1,
-      },
-    )
-
-    if (headingRef.current) {
-      headingObserver.observe(headingRef.current)
-    }
-
-    const aboutObserver = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsAboutVisible(true)
-          // Once visible, no need to observe anymore
-          if (aboutContentRef.current) {
-            aboutObserver.unobserve(aboutContentRef.current)
-          }
-        }
-      },
-      {
-        threshold: 0.1,
-      },
-    )
-
-    if (aboutContentRef.current) {
-      aboutObserver.observe(aboutContentRef.current)
-    }
-
-    const servicesObserver = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsServicesVisible(true)
-          // Once visible, no need to observe anymore
-          if (servicesContentRef.current) {
-            servicesObserver.unobserve(servicesContentRef.current)
-          }
-        }
-      },
-      {
-        threshold: 0.1,
-      },
-    )
-
-    if (servicesContentRef.current) {
-      servicesObserver.observe(servicesContentRef.current)
-    }
-
-    const servicesTitleObserver = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsServicesTitleVisible(true)
-          // Once visible, no need to observe anymore
-          if (servicesTitleRef.current) {
-            servicesTitleObserver.unobserve(servicesTitleRef.current)
-          }
-        }
-      },
-      {
-        threshold: 0.1,
-      },
-    )
-
-    if (servicesTitleRef.current) {
-      servicesTitleObserver.observe(servicesTitleRef.current)
-    }
-
-    return () => {
-      if (headingRef.current) {
-        headingObserver.unobserve(headingRef.current)
-      }
-      if (aboutContentRef.current) {
-        aboutObserver.unobserve(aboutContentRef.current)
-      }
-      if (servicesContentRef.current) {
-        servicesObserver.unobserve(servicesContentRef.current)
-      }
-      if (servicesTitleRef.current) {
-        servicesTitleObserver.unobserve(servicesTitleRef.current)
-      }
-    }
-  }, [])
-
-  // Calculate scale factor based on blur amount
-  // Maintain the same scaling effect even with reduced blur
-  const scaleFactor = 1 + blurAmount / 16 // Adjusted to maintain similar scaling with reduced blur
-
-  // Add a warp speed effect to stars based on blur amount
-  const warpSpeedStyle = {
-    transform: `scale(${scaleFactor})`,
-    transition: "transform 0.2s ease-out", // Slightly longer transition for smoother effect
+  const save = () => {
+    onUpdate(draft)
+    setEditing(false)
   }
 
-  // Scroll to about section
-  const scrollToAbout = () => {
-    if (aboutSectionRef.current) {
-      aboutSectionRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      })
-    }
-  }
-
-  // Scroll to contact section
-  const scrollToContact = () => {
-    if (contactSectionRef.current) {
-      contactSectionRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      })
-    }
-  }
-
-  // Open chatbot modal
-  const openChatbot = () => {
-    setIsChatbotOpen(true)
-  }
-
-  // Close chatbot modal
-  const closeChatbot = () => {
-    setIsChatbotOpen(false)
-  }
-
-  // Use fixed height for hero section based on initial viewport height
-  const heroStyle = {
-    height: initialHeight ? `${initialHeight}px` : "100vh",
+  const cancel = () => {
+    setDraft(card)
+    setEditing(false)
   }
 
   return (
-    <div className="min-h-screen">
-      <section className="relative w-full overflow-hidden bg-black" style={heroStyle}>
-        {/* Navigation links in top right corner */}
-        <div className="absolute top-6 right-6 z-10 flex space-x-3">
-          <a
-            href="https://linkedin.com/company/example"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Профиль в LinkedIn"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white bg-transparent text-white transition-colors hover:bg-white hover:text-black focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-black"
+    <div
+      className={`relative rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-5 flex flex-col gap-2 transition-all hover:border-white/20 hover:bg-white/8 ${sizeMap[card.size].cols} ${sizeMap[card.size].minH}`}
+    >
+      {isAdmin && !editing && (
+        <div className="absolute top-3 right-3 flex gap-1">
+          <button
+            onClick={() => { setDraft(card); setEditing(true) }}
+            className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-all"
+            title="Редактировать"
           >
-            <Linkedin className="h-5 w-5" />
-          </a>
-
-          <Button
-            onClick={scrollToContact}
-            variant="outline"
-            size="sm"
-            className="bg-transparent text-white border-white hover:bg-white hover:text-black transition-colors"
+            <Icon name="Pencil" size={14} />
+          </button>
+          <button
+            onClick={() => onDelete(card.id)}
+            className="p-1.5 rounded-lg bg-white/10 hover:bg-red-500/40 text-white/70 hover:text-red-300 transition-all"
+            title="Удалить"
           >
-            Контакты
-          </Button>
+            <Icon name="Trash2" size={14} />
+          </button>
         </div>
+      )}
 
-        <div className="absolute inset-0" style={warpSpeedStyle}>
+      {editing ? (
+        <div className="flex flex-col gap-3">
+          <div className="flex gap-2 items-center">
+            <input
+              value={draft.emoji}
+              onChange={e => setDraft({ ...draft, emoji: e.target.value })}
+              className="w-14 bg-white/10 border border-white/20 rounded-lg px-2 py-1 text-white text-center text-xl"
+              placeholder="🚀"
+            />
+            <input
+              value={draft.title}
+              onChange={e => setDraft({ ...draft, title: e.target.value })}
+              className="flex-1 bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 text-white placeholder-white/40 text-sm"
+              placeholder="Заголовок"
+            />
+          </div>
+          <textarea
+            value={draft.description}
+            onChange={e => setDraft({ ...draft, description: e.target.value })}
+            rows={3}
+            className="bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-white/40 text-sm resize-none"
+            placeholder="Описание..."
+          />
+          <div className="flex gap-2 items-center">
+            <span className="text-white/50 text-xs">Размер:</span>
+            {(["small", "medium", "large"] as const).map(s => (
+              <button
+                key={s}
+                onClick={() => setDraft({ ...draft, size: s })}
+                className={`text-xs px-2.5 py-1 rounded-lg border transition-all ${
+                  draft.size === s
+                    ? "border-purple-400 bg-purple-400/20 text-purple-300"
+                    : "border-white/20 bg-white/5 text-white/50 hover:border-white/40"
+                }`}
+              >
+                {sizeMap[s].label}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={save} className="flex-1 py-1.5 bg-purple-500/80 hover:bg-purple-500 text-white rounded-lg text-sm font-medium transition-colors">
+              Сохранить
+            </button>
+            <button onClick={cancel} className="flex-1 py-1.5 bg-white/10 hover:bg-white/20 text-white/70 rounded-lg text-sm transition-colors">
+              Отмена
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="text-3xl">{card.emoji}</div>
+          <h3 className="text-white font-semibold text-base leading-tight">{card.title}</h3>
+          <p className="text-white/60 text-sm leading-relaxed">{card.description}</p>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ─── Главная страница ─────────────────────────────────────────────────────────
+export default function Index() {
+  const [data, setData] = useState<SiteData>(loadData)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [showAdminLogin, setShowAdminLogin] = useState(false)
+  const [adminPassword, setAdminPassword] = useState("")
+  const [passwordError, setPasswordError] = useState(false)
+  const [blurAmount, setBlurAmount] = useState(0)
+  const [initialHeight, setInitialHeight] = useState(0)
+  const [editingField, setEditingField] = useState<string | null>(null)
+  const scrollRef = useRef(0)
+  const ticking = useRef(false)
+  const ADMIN_PASSWORD = "admin123"
+
+  useEffect(() => {
+    if (initialHeight === 0) setInitialHeight(window.innerHeight)
+  }, [initialHeight])
+
+  useEffect(() => {
+    const handleScroll = () => {
+      scrollRef.current = window.scrollY
+      if (!ticking.current) {
+        window.requestAnimationFrame(() => {
+          const maxBlur = 8
+          const triggerHeight = initialHeight * 1.2
+          setBlurAmount(Math.min(maxBlur, (scrollRef.current / triggerHeight) * maxBlur))
+          ticking.current = false
+        })
+        ticking.current = true
+      }
+    }
+    window.addEventListener("scroll", handleScroll, { passive: true })
+    return () => window.removeEventListener("scroll", handleScroll)
+  }, [initialHeight])
+
+  const persist = (next: SiteData) => {
+    setData(next)
+    saveData(next)
+  }
+
+  const updateCard = (updated: Card) =>
+    persist({ ...data, cards: data.cards.map(c => (c.id === updated.id ? updated : c)) })
+
+  const deleteCard = (id: number) =>
+    persist({ ...data, cards: data.cards.filter(c => c.id !== id) })
+
+  const addCard = () => {
+    const newCard: Card = {
+      id: Date.now(),
+      title: "Новая плашка",
+      description: "Добавьте описание здесь.",
+      size: "small",
+      emoji: "⭐",
+    }
+    persist({ ...data, cards: [...data.cards, newCard] })
+  }
+
+  const login = () => {
+    if (adminPassword === ADMIN_PASSWORD) {
+      setIsAdmin(true)
+      setShowAdminLogin(false)
+      setAdminPassword("")
+      setPasswordError(false)
+    } else {
+      setPasswordError(true)
+    }
+  }
+
+  const scaleFactor = 1 + blurAmount / 16
+  const heroStyle = { height: initialHeight ? `${initialHeight}px` : "100vh" }
+
+  return (
+    <div className="min-h-screen bg-black text-white">
+      {/* ── Герой со звёздами ── */}
+      <section className="relative w-full overflow-hidden bg-black" style={heroStyle}>
+        <div className="absolute inset-0" style={{ transform: `scale(${scaleFactor})`, transition: "transform 0.2s ease-out" }}>
           <StarField blurAmount={blurAmount} />
         </div>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <div className="text-center">
-            <div
-              className="backdrop-blur-sm px-6 py-4 rounded-lg inline-block relative"
-              style={{
-                background: "radial-gradient(circle, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,0.3) 100%)",
-              }}
-            >
-              <h1 className="text-4xl font-bold text-white md:text-6xl font-heading">
-                Nebula Ventures{" "}
-                <span role="img" aria-label="rocket">
-                  🚀
-                </span>
-              </h1>
-              <p className="mt-4 text-lg text-gray-300 md:text-xl px-4 max-w-xs mx-auto md:max-w-none">
-                Экспертиза в области ИИ и технологий
-              </p>
-              <Button
-                onClick={scrollToAbout}
-                variant="outline"
-                size="sm"
-                className="mt-6 bg-transparent text-white border-white hover:bg-white hover:text-black transition-colors"
-              >
-                О нас
-              </Button>
-            </div>
-          </div>
 
+        {/* Кнопка входа для админа */}
+        <div className="absolute top-4 right-4 z-20">
+          {!isAdmin ? (
+            <button
+              onClick={() => setShowAdminLogin(v => !v)}
+              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white/60 hover:text-white border border-white/10 transition-all"
+              title="Войти как администратор"
+            >
+              <Icon name="Settings" size={18} />
+            </button>
+          ) : (
+            <button
+              onClick={() => setIsAdmin(false)}
+              className="px-3 py-1.5 rounded-xl bg-purple-500/30 hover:bg-purple-500/50 text-purple-300 border border-purple-500/30 text-sm transition-all"
+            >
+              Режим просмотра
+            </button>
+          )}
+
+          {showAdminLogin && !isAdmin && (
+            <div className="absolute top-10 right-0 w-56 bg-gray-900/95 border border-white/10 rounded-2xl p-4 flex flex-col gap-2 shadow-2xl">
+              <input
+                type="password"
+                value={adminPassword}
+                onChange={e => { setAdminPassword(e.target.value); setPasswordError(false) }}
+                onKeyDown={e => e.key === "Enter" && login()}
+                placeholder="Пароль"
+                className={`bg-white/10 border ${passwordError ? "border-red-400" : "border-white/20"} rounded-lg px-3 py-2 text-white placeholder-white/40 text-sm`}
+              />
+              {passwordError && <p className="text-red-400 text-xs">Неверный пароль</p>}
+              <button onClick={login} className="py-2 bg-purple-500 hover:bg-purple-600 rounded-lg text-white text-sm font-medium transition-colors">
+                Войти
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Центральный контент */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center px-4">
           <div
-            className="absolute bottom-20 animate-bounce cursor-pointer"
-            onClick={scrollToAbout}
-            role="button"
-            aria-label="Перейти к разделу о нас"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                scrollToAbout()
-              }
-            }}
+            className="text-center backdrop-blur-sm px-8 py-6 rounded-2xl"
+            style={{ background: "radial-gradient(circle, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.5) 70%, transparent 100%)" }}
           >
-            <ChevronDown className="h-8 w-8 text-white" />
+            <h1 className="text-4xl font-bold md:text-6xl font-heading">
+              {data.platformName} 🚀
+            </h1>
+            <p className="mt-3 text-lg text-white/70 md:text-xl">
+              {data.nickname}
+            </p>
           </div>
+        </div>
+
+        {/* Стрелка вниз */}
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
+          <Icon name="ChevronDown" size={28} className="text-white/40" />
         </div>
       </section>
 
-      <section ref={aboutSectionRef} id="about" className="py-20 bg-gradient-to-b from-black to-gray-900 text-white">
-        <div className="container mx-auto px-4">
-          <div
-            ref={aboutContentRef}
-            className={cn(
-              "max-w-4xl mx-auto transition-all duration-1000 ease-out",
-              isAboutVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10",
+      {/* ── Основной контент ── */}
+      <section className="relative bg-gradient-to-b from-black via-gray-950 to-black min-h-screen pb-12">
+        <div className="max-w-3xl mx-auto px-4 pt-8 pb-32">
+
+          {/* Баннер */}
+          <div className="relative mb-8 rounded-2xl border border-purple-500/30 bg-purple-500/10 backdrop-blur-sm px-5 py-3.5">
+            {isAdmin ? (
+              <input
+                value={data.banner}
+                onChange={e => persist({ ...data, banner: e.target.value })}
+                className="w-full bg-transparent text-purple-200 text-sm font-medium text-center outline-none placeholder-purple-300/50"
+                placeholder="Текст баннера..."
+              />
+            ) : (
+              <p className="text-purple-200 text-sm font-medium text-center">{data.banner}</p>
             )}
-          >
-            <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12">
-              <div className="w-48 h-48 md:w-64 md:h-64 rounded-full overflow-hidden border-4 border-gray-700 flex-shrink-0">
-                <img
-                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/icon-d4g0PyeQftYkhSxiNDNMwiGNNteM3o.svg"
-                  alt="Профиль"
-                  className="w-full h-full object-cover"
+            {isAdmin && (
+              <span className="absolute top-1 right-2 text-purple-400/50 text-xs">✏️ баннер</span>
+            )}
+          </div>
+
+          {/* Плашки */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {data.cards.map(card => (
+              <CardItem
+                key={card.id}
+                card={card}
+                isAdmin={isAdmin}
+                onUpdate={updateCard}
+                onDelete={deleteCard}
+              />
+            ))}
+
+            {/* Кнопка добавить плашку */}
+            {isAdmin && (
+              <button
+                onClick={addCard}
+                className="col-span-1 rounded-2xl border-2 border-dashed border-white/20 hover:border-purple-400/50 bg-transparent hover:bg-purple-500/5 min-h-[120px] flex flex-col items-center justify-center gap-2 text-white/30 hover:text-purple-300 transition-all"
+              >
+                <Icon name="Plus" size={28} />
+                <span className="text-sm">Добавить плашку</span>
+              </button>
+            )}
+          </div>
+
+          {/* Трек */}
+          <div className="mt-10">
+            {isAdmin ? (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                <p className="text-white/50 text-xs mb-3 uppercase tracking-wider">Трек</p>
+                <input
+                  value={data.trackTitle}
+                  onChange={e => persist({ ...data, trackTitle: e.target.value })}
+                  className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm mb-2 outline-none"
+                  placeholder="Название трека"
+                />
+                <input
+                  value={data.trackUrl}
+                  onChange={e => persist({ ...data, trackUrl: e.target.value })}
+                  className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white/70 text-sm outline-none"
+                  placeholder="Ссылка на трек (SoundCloud, Spotify, прямой .mp3...)"
                 />
               </div>
-              <div className="space-y-4 text-center md:text-left px-4 md:px-0">
-                <h2 className="text-3xl font-bold font-heading">О нас</h2>
-                <div className="space-y-4 max-w-2xl">
-                  <p className="text-gray-300">
-                    Мы помогаем компаниям использовать передовые технологии, чтобы радовать клиентов
-                    и оптимизировать бизнес-процессы.
-                  </p>
-                  <p className="text-gray-300">
-                    Стратегическое планирование, техническое лидерство или практическая поддержка разработки —
-                    мы поможем создать правильные решения для вашего бизнеса.
-                  </p>
-                  <p className="text-gray-300">
-                    Наша команда имеет более 10 лет опыта создания сложных технических продуктов
-                    для стартапов и крупных компаний. Свяжитесь с нами или попробуйте ИИ-ассистента.
-                  </p>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-3 pt-4 justify-center md:justify-start">
-                  <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-3 justify-center md:justify-start">
-                    <Button
-                      onClick={scrollToContact}
-                      variant="outline"
-                      size="sm"
-                      className="bg-transparent text-white border-white hover:bg-white hover:text-black transition-colors w-[140px] mx-auto sm:mx-0"
-                    >
-                      Связаться
-                    </Button>
-                    <Button
-                      onClick={openChatbot}
-                      variant="outline"
-                      size="sm"
-                      className="bg-transparent text-white border-white hover:bg-white hover:text-black transition-colors w-[140px] mx-auto sm:mx-0 flex items-center justify-center"
-                    >
-                      <Robot className="mr-1 h-4 w-4" />
-                      ИИ-чат
-                    </Button>
+            ) : data.trackUrl ? (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-full bg-purple-500/30 flex items-center justify-center">
+                    <Icon name="Music" size={16} className="text-purple-300" />
                   </div>
+                  <span className="text-white font-medium text-sm">{data.trackTitle}</span>
                 </div>
+                {data.trackUrl.endsWith(".mp3") || data.trackUrl.includes("stream") ? (
+                  <audio controls className="w-full" style={{ borderRadius: "12px" }}>
+                    <source src={data.trackUrl} />
+                  </audio>
+                ) : (
+                  <a
+                    href={data.trackUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-purple-300 hover:text-purple-200 text-sm transition-colors"
+                  >
+                    <Icon name="ExternalLink" size={14} />
+                    Открыть трек
+                  </a>
+                )}
               </div>
-            </div>
+            ) : null}
           </div>
         </div>
       </section>
 
-      <section ref={servicesSectionRef} id="services" className="py-20 bg-gray-900 text-white">
-        <div className="container mx-auto px-4">
-          <h2
-            ref={servicesTitleRef}
-            className={cn(
-              "mb-12 text-center text-3xl font-bold font-heading transition-all duration-1000 ease-out",
-              isServicesTitleVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10",
-            )}
-          >
-            Услуги
-          </h2>
-          <div
-            ref={servicesContentRef}
-            className={cn(
-              "max-w-5xl mx-auto transition-all duration-1000 ease-out",
-              isServicesVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10",
-            )}
-          >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Fractional CPO */}
-              <div className="bg-gray-800 rounded-lg p-6 transition-all duration-300 hover:bg-gray-700">
-                <div className="flex items-center mb-4">
-                  <Users className="h-7 w-7 text-white mr-4" aria-hidden="true" />
-                  <h3 className="text-xl font-semibold font-heading">CPO / CTO на аутсорсе</h3>
-                </div>
-                <p className="text-gray-300">
-                  Продуктовое лидерство, выстраивание процессов, развитие команды, технологическая стратегия.
-                </p>
-              </div>
+      {/* ── Футер ── */}
+      <footer className="bg-black border-t border-white/5 py-6 px-4">
+        <div className="max-w-3xl mx-auto flex flex-col items-center gap-3">
+          {/* Название платформы */}
+          {isAdmin ? (
+            <input
+              value={data.platformName}
+              onChange={e => persist({ ...data, platformName: e.target.value })}
+              className="bg-transparent text-white font-bold text-lg text-center outline-none border-b border-white/20 pb-0.5 w-48"
+              placeholder="Название платформы"
+            />
+          ) : (
+            <span className="text-white font-bold text-lg">{data.platformName}</span>
+          )}
 
-              {/* Product Consulting */}
-              <div className="bg-gray-800 rounded-lg p-6 transition-all duration-300 hover:bg-gray-700">
-                <div className="flex items-center mb-4">
-                  <LineChart className="h-7 w-7 text-white mr-4" aria-hidden="true" />
-                  <h3 className="text-xl font-semibold font-heading">Продуктовый консалтинг</h3>
-                </div>
-                <p className="text-gray-300">
-                  Разработка роадмапа, поиск и валидация product-market fit, оценка кандидатов.
-                </p>
-              </div>
-
-              {/* Interim Leadership */}
-              <div className="bg-gray-800 rounded-lg p-6 transition-all duration-300 hover:bg-gray-700">
-                <div className="flex items-center mb-4">
-                  <Clock className="h-7 w-7 text-white mr-4" aria-hidden="true" />
-                  <h3 className="text-xl font-semibold font-heading">Временное руководство</h3>
-                </div>
-                <p className="text-gray-300">Временный CPO или VP of Product для компаний в период трансформации.</p>
-              </div>
-
-              {/* Workshops & Advisory */}
-              <div className="bg-gray-800 rounded-lg p-6 transition-all duration-300 hover:bg-gray-700">
-                <div className="flex items-center mb-4">
-                  <Lightbulb className="h-7 w-7 text-white mr-4" aria-hidden="true" />
-                  <h3 className="text-xl font-semibold font-heading">Разработка продуктов</h3>
-                </div>
-                <p className="text-gray-300">
-                  Быстрое прототипирование и запуск внутренних и внешних приложений и сайтов
-                  с использованием современных инструментов.
-                </p>
-              </div>
+          {/* Ник + ссылка */}
+          {isAdmin ? (
+            <div className="flex flex-col sm:flex-row items-center gap-2">
+              <input
+                value={data.nickname}
+                onChange={e => persist({ ...data, nickname: e.target.value })}
+                className="bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 text-white/70 text-sm outline-none w-36 text-center"
+                placeholder="@ник"
+              />
+              <input
+                value={data.profileUrl}
+                onChange={e => persist({ ...data, profileUrl: e.target.value })}
+                className="bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 text-white/50 text-sm outline-none w-56"
+                placeholder="https://ссылка..."
+              />
             </div>
-          </div>
-        </div>
-      </section>
+          ) : (
+            <a
+              href={data.profileUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-white/50 hover:text-purple-300 text-sm transition-colors flex items-center gap-1.5"
+            >
+              <Icon name="Link" size={13} />
+              {data.nickname}
+            </a>
+          )}
 
-      <section ref={contactSectionRef} id="contact" className="bg-gray-100 py-16">
-        <div className="container mx-auto px-4">
-          <h2
-            ref={headingRef}
-            className={cn(
-              "mb-12 text-center text-3xl font-bold font-heading transition-all duration-1000 ease-out",
-              isHeadingVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10",
-            )}
-          >
-            Давайте создавать
-          </h2>
-          <ContactForm />
+          <p className="text-white/20 text-xs mt-1">© {new Date().getFullYear()}</p>
         </div>
-      </section>
-
-      {/* Chatbot Modal */}
-      <ChatbotModal isOpen={isChatbotOpen} onClose={closeChatbot} />
+      </footer>
     </div>
   )
 }
