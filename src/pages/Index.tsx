@@ -381,6 +381,55 @@ function StyleEditor({ style, onChange }: { style: CardStyle; onChange: (s: Card
   )
 }
 
+// ─── Sortable-обёртка для блока ───────────────────────────────────────────────
+function SortableBlock({
+  block, cardStyle, isAdmin, onUpdateBlock, onRemoveBlock,
+}: {
+  block: CardBlock
+  cardStyle: CardStyle
+  isAdmin: boolean
+  onUpdateBlock: (b: CardBlock) => void
+  onRemoveBlock: (id: string) => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: block.id, disabled: !isAdmin })
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition: transition ?? undefined }}
+      className={`relative group/block ${isDragging ? "opacity-40 z-50" : ""}`}
+    >
+      {/* Ручка перетаскивания блока */}
+      {isAdmin && (
+        <button
+          {...attributes}
+          {...listeners}
+          className="absolute -left-1 top-1/2 -translate-y-1/2 z-10 p-0.5 rounded opacity-0 group-hover/block:opacity-100 transition-opacity cursor-grab active:cursor-grabbing text-white/30 hover:text-white/70"
+          title="Переместить блок"
+        >
+          <Icon name="GripVertical" size={14} />
+        </button>
+      )}
+      <div className={isAdmin ? "pl-4" : ""}>
+        <BlockView
+          block={block}
+          cardStyle={cardStyle}
+          isAdmin={isAdmin}
+          onUpdateBlock={onUpdateBlock}
+          onRemoveBlock={onRemoveBlock}
+        />
+      </div>
+    </div>
+  )
+}
+
 // ─── Единая плашка (с drag-and-drop) ─────────────────────────────────────────
 function UnifiedCard({
   card, isAdmin, onUpdate, onDelete,
@@ -401,11 +450,22 @@ function UnifiedCard({
   const [showSettings, setShowSettings] = useState(false)
   const [showAddBlock, setShowAddBlock] = useState(false)
 
+  const blockSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+
   const updateBlock = (updated: CardBlock) =>
     onUpdate({ ...card, blocks: card.blocks.map(b => b.id === updated.id ? updated : b) })
 
   const removeBlock = (bid: string) =>
     onUpdate({ ...card, blocks: card.blocks.filter(b => b.id !== bid) })
+
+  const handleBlockDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (over && active.id !== over.id) {
+      const oldIdx = card.blocks.findIndex(b => b.id === active.id)
+      const newIdx = card.blocks.findIndex(b => b.id === over.id)
+      onUpdate({ ...card, blocks: arrayMove(card.blocks, oldIdx, newIdx) })
+    }
+  }
 
   const addBlock = (type: BlockType) => {
     const id = `b${Date.now()}`
@@ -498,16 +558,20 @@ function UnifiedCard({
 
       {/* Блоки */}
       <div className="p-4 flex flex-col gap-4">
-        {card.blocks.map(block => (
-          <BlockView
-            key={block.id}
-            block={block}
-            cardStyle={card.style}
-            isAdmin={isAdmin}
-            onUpdateBlock={updateBlock}
-            onRemoveBlock={removeBlock}
-          />
-        ))}
+        <DndContext sensors={blockSensors} collisionDetection={closestCenter} onDragEnd={handleBlockDragEnd}>
+          <SortableContext items={card.blocks.map(b => b.id)} strategy={rectSortingStrategy}>
+            {card.blocks.map(block => (
+              <SortableBlock
+                key={block.id}
+                block={block}
+                cardStyle={card.style}
+                isAdmin={isAdmin}
+                onUpdateBlock={updateBlock}
+                onRemoveBlock={removeBlock}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
         {card.blocks.length === 0 && isAdmin && (
           <p className="text-white/20 text-xs text-center py-4">Плашка пустая — добавь блок ↑</p>
         )}
