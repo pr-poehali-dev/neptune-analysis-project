@@ -1,6 +1,21 @@
 import { StarField } from "@/components/StarField"
 import { useState, useEffect, useRef } from "react"
 import Icon from "@/components/ui/icon"
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  useSortable,
+  rectSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 
 // ─── типы ────────────────────────────────────────────────────────────────────
 type Platform = "steam" | "telegram" | "vk" | "youtube" | "discord" | "tiktok" | "twitter" | "instagram" | "twitch"
@@ -366,7 +381,7 @@ function StyleEditor({ style, onChange }: { style: CardStyle; onChange: (s: Card
   )
 }
 
-// ─── Единая плашка ────────────────────────────────────────────────────────────
+// ─── Единая плашка (с drag-and-drop) ─────────────────────────────────────────
 function UnifiedCard({
   card, isAdmin, onUpdate, onDelete,
 }: {
@@ -375,6 +390,14 @@ function UnifiedCard({
   onUpdate: (c: Card) => void
   onDelete: (id: number) => void
 }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: card.id, disabled: !isAdmin })
   const [showSettings, setShowSettings] = useState(false)
   const [showAddBlock, setShowAddBlock] = useState(false)
 
@@ -407,11 +430,13 @@ function UnifiedCard({
 
   return (
     <div
-      className={`relative rounded-2xl overflow-visible transition-all duration-200 group ${sizeMap[card.size].cols} ${sizeMap[card.size].minH}`}
+      ref={setNodeRef}
+      className={`relative rounded-2xl overflow-visible transition-colors duration-200 group ${sizeMap[card.size].cols} ${sizeMap[card.size].minH} ${isDragging ? "opacity-50 z-50" : ""}`}
       style={{
         backgroundColor: s.bg,
         border: `1px solid ${s.border}`,
-        // hover через JS т.к. tailwind не поддерживает динамические цвета
+        transform: CSS.Transform.toString(transform),
+        transition: transition ?? undefined,
       }}
       onMouseEnter={e => (e.currentTarget.style.borderColor = s.hoverBorder)}
       onMouseLeave={e => (e.currentTarget.style.borderColor = s.border)}
@@ -419,6 +444,15 @@ function UnifiedCard({
       {/* Панель управления плашкой */}
       {isAdmin && (
         <div className="absolute -top-3 right-2 flex gap-1 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* Перетащить */}
+          <button
+            {...attributes}
+            {...listeners}
+            className="p-1 rounded-md bg-black/60 border border-white/15 text-white/40 hover:text-white/70 transition-all cursor-grab active:cursor-grabbing"
+            title="Перетащить"
+          >
+            <Icon name="GripVertical" size={12} />
+          </button>
           {/* Размер */}
           {(["small", "medium", "large"] as const).map(sz => (
             <button
@@ -511,9 +545,21 @@ export default function Index() {
     return () => window.removeEventListener("scroll", onScroll)
   }, [initH])
 
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+
   const persist = (next: SiteData) => { setData(next); saveData(next) }
   const updateCard = (updated: Card) => persist({ ...data, cards: data.cards.map(c => c.id === updated.id ? updated : c) })
   const deleteCard = (id: number) => persist({ ...data, cards: data.cards.filter(c => c.id !== id) })
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (over && active.id !== over.id) {
+      const oldIndex = data.cards.findIndex(c => c.id === active.id)
+      const newIndex = data.cards.findIndex(c => c.id === over.id)
+      persist({ ...data, cards: arrayMove(data.cards, oldIndex, newIndex) })
+    }
+  }
+
   const addCard = () => persist({
     ...data,
     cards: [...data.cards, {
@@ -577,20 +623,24 @@ export default function Index() {
       {/* ── Плашки ── */}
       <section className="bg-gradient-to-b from-black via-gray-950 to-black min-h-screen">
         <div className="max-w-3xl mx-auto px-4 pt-8 pb-32">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            {data.cards.map(card => (
-              <UnifiedCard key={card.id} card={card} isAdmin={isAdmin} onUpdate={updateCard} onDelete={deleteCard} />
-            ))}
-            {isAdmin && (
-              <button
-                onClick={addCard}
-                className="col-span-1 rounded-2xl border-2 border-dashed border-white/15 hover:border-purple-400/40 min-h-[120px] flex flex-col items-center justify-center gap-2 text-white/25 hover:text-purple-300 transition-all"
-              >
-                <Icon name="Plus" size={24} />
-                <span className="text-sm">Новая плашка</span>
-              </button>
-            )}
-          </div>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={data.cards.map(c => c.id)} strategy={rectSortingStrategy}>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                {data.cards.map(card => (
+                  <UnifiedCard key={card.id} card={card} isAdmin={isAdmin} onUpdate={updateCard} onDelete={deleteCard} />
+                ))}
+                {isAdmin && (
+                  <button
+                    onClick={addCard}
+                    className="col-span-1 rounded-2xl border-2 border-dashed border-white/15 hover:border-purple-400/40 min-h-[120px] flex flex-col items-center justify-center gap-2 text-white/25 hover:text-purple-300 transition-all"
+                  >
+                    <Icon name="Plus" size={24} />
+                    <span className="text-sm">Новая плашка</span>
+                  </button>
+                )}
+              </div>
+            </SortableContext>
+          </DndContext>
         </div>
       </section>
 
